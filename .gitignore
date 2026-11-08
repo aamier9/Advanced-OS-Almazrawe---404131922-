@@ -1,0 +1,13 @@
+*.o
+*.so
+*.out
+build/
+bin/
+apager
+dpager
+hpager
+tests/hello
+tests/array_test
+tests/bss_test
+tests/memory_error
+tests/sequential_access
