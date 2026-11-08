@@ -3,9 +3,9 @@
 *.out
 build/
 bin/
-apager
-dpager
-hpager
+/apager
+/dpager
+/hpager
 tests/hello
 tests/array_test
 tests/bss_test
