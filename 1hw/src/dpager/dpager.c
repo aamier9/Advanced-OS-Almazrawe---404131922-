@@ -1,18 +1,18 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
 
-typedef struct {
-    uint32_t frame_no;
-    unsigned char present;
-    uint32_t hits;
-} pte_t;
+#include "pager.h"
 
-int dpager_handle_page_fault(pte_t *pt, size_t max_pgs, uint32_t vpn) {
-    if (!pt || vpn >= max_pgs) return -1;
-    uint32_t f_id = vpn + 300;
-    pt[vpn].frame_no = f_id;
+int dpager_handle_page_fault(pte_t *pt, size_t max_pgs,
+                             uint32_t vpn)
+{
+    if (pt == NULL || vpn >= max_pgs)
+        return -1;
+
+    uint32_t frame = vpn + 300;
+
+    pt[vpn].frame_no = frame;
     pt[vpn].present = 1;
+    pt[vpn].dirty = 0;
     pt[vpn].hits++;
-    return (int)f_id;
+
+    return (int)frame;
 }
