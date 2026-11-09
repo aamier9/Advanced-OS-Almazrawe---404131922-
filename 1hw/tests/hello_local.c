@@ -1,50 +1,108 @@
+
 #include <stdio.h>
-#include <stdint.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include "pager.h"
 
-// Define basic PTE structure matching pagers
-typedef struct {
-    uint32_t frame_no;
-    unsigned char present;
-    unsigned char dirty;
-    uint32_t hits;
-} pte_t;
+#define MAX_PAGES 16
 
-// Declare pager functions from respective modules
-int apager_handle_page_fault(pte_t *pt, size_t max_pgs, uint32_t vpn);
-int hpager_handle_page_fault(pte_t *pt, size_t max_pgs, uint32_t vpn);
-int dpager_handle_page_fault(pte_t *pt, size_t max_pgs, uint32_t vpn);
+/* Stop the test immediately if a condition fails. */
+#define CHECK(condition) do {                                      \
+    if (!(condition)) {                                            \
+        fprintf(stderr, "TEST FAILED: %s (line %d)\n",             \
+                #condition, __LINE__);                             \
+        exit(EXIT_FAILURE);                                        \
+    }                                                              \
+} while (0)
 
-int main(int argc, char *argv[]) {
-    (void)argc;
-    (void)argv;
+/* Check whether a PTE still contains its expected values. */
+static int entry_matches(const pte_t *entry,
+                         uint32_t frame,
+                         unsigned char present,
+                         unsigned char dirty,
+                         uint32_t hits)
+{
+    return entry->frame_no == frame &&
+           entry->present == present &&
+           entry->dirty == dirty &&
+           entry->hits == hits;
+}
 
-    printf("=== Starting Advanced OS Pager Tests ===\n\n");
+static void test_apager(void)
+{
+    pte_t *pt = calloc(MAX_PAGES, sizeof(pte_t));
+    CHECK(pt != NULL);
 
-    const size_t MAX_PAGES = 16;
-    pte_t *page_table = (pte_t *)calloc(MAX_PAGES, sizeof(pte_t));
-    if (!page_table) {
-        perror("allocation failed");
-        return 1;
-    }
+    int frame = apager_handle_page_fault(pt, MAX_PAGES, 2);
 
-    // 1. Test Demand Pager (apager)
-    printf("--- Testing Demand Pager (apager) ---\n");
-    int frame1 = apager_handle_page_fault(page_table, MAX_PAGES, 2);
-    printf("APAGER Result -> VPN 2 mapped to Frame: %d\n\n", frame1);
+    CHECK(frame == 102);
+    CHECK(entry_matches(&pt[2], 102, 1, 0, 0));
 
-    // 2. Test Heuristic/Prefetching Pager (hpager)
-    printf("--- Testing Heuristic Pager (hpager) ---\n");
-    int frame2 = hpager_handle_page_fault(page_table, MAX_PAGES, 5);
-    printf("HPAGER Result -> VPN 5 mapped to Frame: %d (with prefetch)\n", frame2);
-    printf("Check prefetch status for VPN 6: present = %u\n\n", page_table[6].present);
+    /* Invalid arguments must be rejected. */
+    CHECK(apager_handle_page_fault(NULL, MAX_PAGES, 2) == -1);
+    CHECK(apager_handle_page_fault(pt, MAX_PAGES, MAX_PAGES) == -1);
 
-    // 3. Test Dynamic Pager (dpager)
-    printf("--- Testing Dynamic Pager (dpager) ---\n");
-    int frame3 = dpager_handle_page_fault(page_table, MAX_PAGES, 10);
-    printf("DPAGER Result -> VPN 10 mapped to Frame: %d\n", frame3);
+    free(pt);
+    printf("APAGER: PASS\n");
+}
 
-    free(page_table);
-    printf("\n=== All Pager Tests Completed Successfully ===\n");
-    return 0;
+static void test_hpager(void)
+{
+    pte_t *pt = calloc(MAX_PAGES, sizeof(pte_t));
+    CHECK(pt != NULL);
+
+    int frame = hpager_handle_page_fault(pt, MAX_PAGES, 5);
+
+    CHECK(frame == 205);
+    CHECK(entry_matches(&pt[5], 205, 1, 0, 0));
+    CHECK(entry_matches(&pt[6], 206, 1, 0, 0));
+    CHECK(entry_matches(&pt[7], 207, 1, 0, 0));
+
+    /* An already-present page must not be overwritten by prefetch. */
+    pt[9].frame_no = 999;
+    pt[9].present = 1;
+    pt[9].dirty = 1;
+    pt[9].hits = 7;
+
+    CHECK(hpager_handle_page_fault(pt, MAX_PAGES, 8) == 208);
+    CHECK(entry_matches(&pt[9], 999, 1, 1, 7));
+
+    /* Test the last valid VPN: prefetch must stay within the table. */
+    CHECK(hpager_handle_page_fault(pt, MAX_PAGES, 15) == 215);
+    CHECK(pt[15].present == 1);
+
+    CHECK(hpager_handle_page_fault(NULL, MAX_PAGES, 5) == -1);
+    CHECK(hpager_handle_page_fault(pt, MAX_PAGES, MAX_PAGES) == -1);
+
+    free(pt);
+    printf("HPAGER: PASS\n");
+}
+
+static void test_dpager(void)
+{
+    pte_t *pt = calloc(MAX_PAGES, sizeof(pte_t));
+    CHECK(pt != NULL);
+
+    int frame = dpager_handle_page_fault(pt, MAX_PAGES, 10);
+
+    CHECK(frame == 310);
+    CHECK(entry_matches(&pt[10], 310, 1, 0, 1));
+
+    CHECK(dpager_handle_page_fault(NULL, MAX_PAGES, 10) == -1);
+    CHECK(dpager_handle_page_fault(pt, MAX_PAGES, MAX_PAGES) == -1);
+
+    free(pt);
+    printf("DPAGER: PASS\n");
+}
+
+int main(void)
+{
+    printf("=== Advanced OS Pager Tests ===\n");
+
+    test_apager();
+    test_hpager();
+    test_dpager();
+
+    printf("=== All Pager Tests Passed ===\n");
+    return EXIT_SUCCESS;
 }
