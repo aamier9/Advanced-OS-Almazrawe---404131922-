@@ -11,3 +11,14 @@ tests/array_test
 tests/bss_test
 tests/memory_error
 tests/sequential_access
+# ELF loader test binaries
+tests/elf_layout
+tests/elf_load_test
+tests/elf_target
+tests/elf_validate
+tests/mmap_demo
+
+# Other generated test binaries
+tests/elf_target_*
+# ELF protection test binary
+tests/elf_protection_test
