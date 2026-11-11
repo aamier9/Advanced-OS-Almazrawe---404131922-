@@ -22,3 +22,11 @@ tests/mmap_demo
 tests/elf_target_*
 # ELF protection test binary
 tests/elf_protection_test
+dynamic_linking/test_malloc
+# Generated test binaries
+test_runner
+tests/demand_pager_test
+tests/hybrid_pager_test
+tests/memory_test
+tests/stack_test
+tests/memory_error
